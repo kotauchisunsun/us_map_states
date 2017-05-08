@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<meta charset="UTF-8">
+
+<style>
+
+.state-borders {
+  fill: none;
+  stroke: #222;
+  stroke-width: 0.3px;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+#tooltip-container {
+  position: absolute;
+  background-color: #fff;
+  color: #000;
+  padding: 10px;
+  border: 1px solid;
+  display: none;
+}
+
+
+.tooltip_key {
+  font-weight: bold;
+}
+
+.tooltip_value {
+  margin-left: 20px;
+  float: right;
+}
+
+.button {
+	display: inline-block;
+	zoom: 1; /* zoom and *display = ie7 hack for display:inline-block */
+	*display: inline;
+	vertical-align: baseline;
+	margin: 0 2px;
+	outline: none;
+	cursor: pointer;
+	text-align: center;
+	text-decoration: none;
+	font: 20px/100% Arial, Helvetica, sans-serif;
+	padding: .5em 2em .55em;
+	text-shadow: 0 1px 1px rgba(0,0,0,.3);
+	border-radius: .5em;
+	box-shadow: 0 1px 2px rgba(0,0,0,.2);
+	width: 150px;
+}
+.button:hover {
+	text-decoration: none;
+}
+.button:active {
+	position: relative;
+	top: 1px;
+}
+
+.bigrounded {
+	border-radius: 2em;
+}
+.medium {
+	font-size: 12px;
+	padding: .4em 1.5em .42em;
+}
+.small {
+	font-size: 11px;
+	padding: .2em 1em .275em;
+}
+
+/* white */
+.white {
+	color: #606060;
+	border: solid 1px #b7b7b7;
+	background: #fff;
+	filter:  progid:DXImageTransform.Microsoft.gradient(startColorstr='#ffffff', endColorstr='#ededed');
+}
+.white:hover {
+	background: #ededed;
+	filter:  progid:DXImageTransform.Microsoft.gradient(startColorstr='#ffffff', endColorstr='#dcdcdc');
+}
+.white:active {
+	color: #999;
+	filter:  progid:DXImageTransform.Microsoft.gradient(startColorstr='#ededed', endColorstr='#ffffff');
+}
+.button:disabled {
+	background-color: #666;
+	/*cursor: not-allowed;*/
+}
+
+</style>
+<svg width="960" height="600"></svg>
+<div id="tooltip-container"></div>
+<br>
+	<button class="button white" id='button_main' onClick='draw_main()' disabled="disabled">Start</button>
+	<button class="button white" id='button_init' onClick='draw_init()' disabled="disabled">Init</button>
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="https://d3js.org/topojson.v2.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+<script>
+
+
+// state info
+// state: 州昇格年もしくは分離前に所属していた州が昇格した年
+// territory: 準州設定年
+// separation: 分離した年・
+// id: us mapのid
+var state_info_array = [
+	 {name: 'デラウェア州',         state:1787, territory:null, separation: null, id: '10'}
+	,{name: 'ペンシルベニア州',     state:1787, territory:null, separation: null, id: '42'}
+	,{name: 'ニュージャージー州',   state:1787, territory:null, separation: null, id: '34'}
+	,{name: 'ジョージア州',         state:1788, territory:null, separation: null, id: '13' }
+	,{name: 'コネチカット州',       state:1788, territory:null, separation: null, id: '09' }
+	,{name: 'マサチューセッツ州',   state:1788, territory:null, separation: null, id: '25' }
+	,{name: 'メリーランド州',       state:1788, territory:null, separation: null, id: '24' }
+	,{name: 'サウスカロライナ州',   state:1788, territory:null, separation: null, id: '45' }
+	,{name: 'ニューハンプシャー州', state:1788, territory:null, separation: null, id: '33' }
+	,{name: 'バージニア州',         state:1788, territory:null, separation: null, id: '51' }
+	,{name: 'ニューヨーク州',       state:1788, territory:null, separation: null, id: '36' }
+	,{name: 'ノースカロライナ州',   state:1789, territory:null, separation: null, id: '37' }
+	,{name: 'ロードアイランド州',   state:1790, territory:null, separation: null, id: '44' }
+	,{name: 'バーモント州',         state:1791, territory:null, separation: null, id: '50' }
+	,{name: 'ケンタッキー州',       state:1788, territory:null, separation: 1792, id: '21' }
+	,{name: 'テネシー州',           state:1796, territory:1790, separation: null, id: '47' }
+	,{name: 'オハイオ州',           state:1803, territory:null, separation: null, id: '39' }
+	,{name: 'ルイジアナ州',         state:1812, territory:1804, separation: null, id: '22' }
+	,{name: 'インディアナ州',       state:1816, territory:1800, separation: null, id: '18' }
+	,{name: 'ミシシッピ州',         state:1817, territory:1798, separation: null, id: '28' }
+	,{name: 'イリノイ州',           state:1818, territory:1809, separation: null, id: '17' }
+	,{name: 'アラバマ州',           state:1819, territory:1798, separation: null, id: '01' }
+	,{name: 'メイン州',             state:1788, territory:null, separation: 1820, id: '23' }
+	,{name: 'ミズーリ州',           state:1821, territory:1805, separation: null, id: '29' }
+	,{name: 'アーカンソー州',       state:1836, territory:1819, separation: null, id: '05' }
+	,{name: 'ミシガン州',           state:1837, territory:1805, separation: null, id: '26' }
+	,{name: 'フロリダ州',           state:1845, territory:1822, separation: null, id: '12' }
+	,{name: 'テキサス州',           state:1845, territory:null, separation: null, id: '48' }
+	,{name: 'アイオワ州',           state:1846, territory:1837, separation: null, id: '19' }
+	,{name: 'ウィスコンシン州',     state:1848, territory:1836, separation: null, id: '55' }
+	,{name: 'カリフォルニア州',     state:1850, territory:null, separation: null, id: '06' }
+	,{name: 'ミネソタ州',           state:1858, territory:1849, separation: null, id: '27' }
+	,{name: 'オレゴン州',           state:1859, territory:1859, separation: null, id: '41' }
+	,{name: 'カンザス州',           state:1861, territory:1854, separation: null, id: '20' }
+	,{name: 'ウェストバージニア州', state:1788, territory:null, separation: 1863, id: '54' }
+	,{name: 'ネバダ州',             state:1864, territory:1861, separation: null, id: '32' }
+	,{name: 'ネブラスカ州',         state:1867, territory:1854, separation: null, id: '31' }
+	,{name: 'コロラド州',           state:1876, territory:1861, separation: null, id: '08' }
+	,{name: 'ノースダコタ州',       state:1889, territory:1861, separation: null, id: '38' }
+	,{name: 'サウスダコタ州',       state:1889, territory:1861, separation: null, id: '46' }
+	,{name: 'モンタナ州',           state:1889, territory:1864, separation: null, id: '30' }
+	,{name: 'ワシントン州',         state:1889, territory:1853, separation: null, id: '53' }
+	,{name: 'アイダホ州',           state:1890, territory:1863, separation: null, id: '16' }
+	,{name: 'ワイオミング州',       state:1890, territory:1868, separation: null, id: '56' }
+	,{name: 'ユタ州',               state:1896, territory:1850, separation: null, id: '49' }
+	,{name: 'オクラホマ州',         state:1907, territory:1890, separation: null, id: '40' }
+	,{name: 'ニューメキシコ州',     state:1912, territory:1850, separation: null, id: '35' }
+	,{name: 'アリゾナ州',           state:1912, territory:1863, separation: null, id: '04' }
+	,{name: 'アラスカ州',           state:1959, territory:1912, separation: null, id: '02' }
+	,{name: 'ハワイ州',             state:1959, territory:1898, separation: null, id: '15' }
+];
+
+// 各種イベント
+// year:発生年
+// event: イベント内容
+var event_array = [
+	{year: 1607, event: '⚒ 入植開始'}
+	,{year: 1767, event: '⚖ タウンゼンド諸法成立'}
+	,{year: 1770, event: '💣 ボストン虐殺事件'}
+	,{year: 1773, event: '💣 ボストン茶会事件'}
+	,{year: 1774, event: '⚖ 第一回大陸会議開催'}
+	,{year: 1775, event: '💣 アメリカ独立戦争開始'}
+	,{year: 1783, event: '💣 アメリカ独立戦争終了'}
+	,{year: 1788, event: '💣 合衆国会議設立'}
+	,{year: 1789, event: '💣 フランス革命開始'}
+	,{year: 1794, event: '💣 フランス革命終了'}
+	//,{year: 1804, event: '⚖ 北部全州で奴隷制度廃止'}
+	,{year: 1812, event: '💣 米英戦争開始'}
+	,{year: 1814, event: '💣 米英戦争終了'}
+	,{year: 1820, event: '⚖ ミズリー妥協'}
+	,{year: 1846, event: '💣 米墨戦争開始'}
+	,{year: 1848, event: '💣 米墨戦争終了'}
+	,{year: 1861, event: '💣 南北戦争開始'}
+	,{year: 1862, event: '⚖ リンカーンによる奴隷解放宣言'}
+	,{year: 1865, event: '💣 南北戦争終了'}
+	,{year: 1898, event: '💣 米西戦争'}
+	,{year: 1899, event: '💣 米比戦争開始'}
+	,{year: 1902, event: '💣 米比戦争終了'}
+	,{year: 1917, event: '💣 WW1参戦'}
+	,{year: 1918, event: '💣 WW1終了'}
+	,{year: 1941, event: '💣 WW2参戦'}
+	,{year: 1945, event: '💣 WW2終了'}
+	,{year: 1950, event: '💣 朝鮮戦争開始'}
+	,{year: 1953, event: '💣 朝鮮戦争終了'}
+	,{year: 1929, event: '💸 世界恐慌'}
+	,{year: 1848, event: '💸 ゴールドラッシュ'}
+	,{year: 1853, event: '⛴ 東インド艦隊　日本に到達'}
+	,{year: 1959, event: '🗺 50州揃う'}
+];
+
+var svg = d3.select("svg");
+
+var path = d3.geoPath();
+var sleep_count     = 0;
+var start_year      = 1765;
+var end_year        = 1959;
+//var year_bin        = 30;
+var year_bin        = 1;
+var timeout         = 1500;
+//var timeout         = 10;
+var sleep_max_count = (end_year - start_year + 1) * year_bin;
+var g_us;
+var requestID;
+var button_status = 0;
+
+function draw_main() {
+	var element_main = document.getElementById('button_main');
+	if (button_status == 0) {
+    button_status = 1;
+		element_main.innerHTML = 'Stop';
+		var element_init = document.getElementById('button_init');
+		element_init.disabled = true;
+
+		draw_us_map(true);
+		
+  } else {
+		button_status = 0;
+		element_main.innerHTML = 'Start';
+		clearTimeout(requestID);
+		var element_init = document.getElementById('button_init');
+		element_init.disabled = false;
+	}
+	
+}
+function draw_init() {
+	sleep_count = 0;
+	clearTimeout(requestID);
+	draw_us_map(false);
+	var element_init = document.getElementById('button_init');
+	element_init.disabled = true;
+	var element_main = document.getElementById('button_main');
+	element_main.innerHTML = 'Start';
+	element_main.disabled = false;
+	button_status = 0;
+	
+}
+
+function draw_us_map(flag) {
+	if (sleep_count >= sleep_max_count) {
+		var element_init = document.getElementById('button_init');
+		element_init.disabled = false;
+		var element_main = document.getElementById('button_main');
+		element_main.disabled = true;
+    return;
+  }
+	//console.log('y: ' + (sleep_count + start_year));
+	svg.selectAll('g').remove();
+	svg.selectAll('text').remove();
+	svg.selectAll('path').remove();
+	//
+	var text_array = [];
+	svg.append("g")
+    .selectAll("path")
+    .data(topojson.feature(g_us, g_us.objects.states).features)
+    .enter().append("path")
+      .attr("d", path)
+      .style("fill", function(d) {
+					for (var i = 0; i < state_info_array.length; i++) {
+						if (d.id == state_info_array[i].id) {
+							if (state_info_array[i].separation == null &&
+									state_info_array[i].state == Math.floor(sleep_count / year_bin) + start_year) {
+								text_array.push({name: state_info_array[i].name, x: d.geometry.coordinates[0][0][0][0], y:d.geometry.coordinates[0][0][0][1]});
+              }
+							if (state_info_array[i].separation != null &&
+									state_info_array[i].separation == Math.floor(sleep_count / year_bin) + start_year) {
+								text_array.push({name: state_info_array[i].name, x: d.geometry.coordinates[0][0][0][0], y:d.geometry.coordinates[0][0][0][1]});
+              }
+							if (state_info_array[i].state <=  Math.floor(sleep_count / year_bin) + start_year) {
+                  return "#00f";
+              } else if (state_info_array[i].territory != null &&
+												 state_info_array[i].territory <=  Math.floor(sleep_count / year_bin) + start_year) {
+                  return "#aaf";
+              } else {
+                  return "#ccc";
+							}
+            }
+					}
+      })
+			.on("mousemove", function(d) {
+            var html = "";
+						var state_name = '';
+						var state_year = '';
+						for (var i = 0; i < state_info_array.length; i++) {
+							if (d.id == state_info_array[i].id) {
+								state_name = state_info_array[i].name;
+								if (state_info_array[i].separation == null) {
+                  state_year = state_info_array[i].state;
+                } else {
+                  state_year = state_info_array[i].separation;
+								}
+								
+								break;
+							}
+						}
+  
+            html += "<div class=\"tooltip_key\">";
+            html += "<span class=\"tooltip_key\">";
+            html += state_name;
+            html += "</span>";
+            html += "<span class=\"tooltip_value\">";
+            html += state_year;
+            html += "";
+            html += "</span>";
+            html += "</div>";
+            
+            $("#tooltip-container").html(html);
+            $(this).attr("fill-opacity", "0.8");
+            $("#tooltip-container").show();
+            
+            var coordinates = d3.mouse(this);
+            
+            var map_width = 960;
+            
+            if (d3.event.layerX < map_width / 2) {
+              d3.select("#tooltip-container")
+                .style("top", (d3.event.layerY + 15) + "px")
+                .style("left", (d3.event.layerX + 15) + "px");
+            } else {
+              var tooltip_width = $("#tooltip-container").width();
+              d3.select("#tooltip-container")
+                .style("top", (d3.event.layerY + 15) + "px")
+                .style("left", (d3.event.layerX - tooltip_width - 30) + "px");
+            }
+        })
+        .on("mouseout", function() {
+                $(this).attr("fill-opacity", "1.0");
+                $("#tooltip-container").hide();
+            });
+
+  svg.append("path")
+      .attr("class", "state-borders")
+      .attr("d", path(topojson.mesh(g_us, g_us.objects.states, function(a, b) { return a !== b; })));
+	if (text_array.length != 0) {
+		for (var i = 0; i < text_array.length; i++) {
+			svg.append("text")
+	    .attr("x", text_array[i].x)
+	    .attr("y", text_array[i].y)
+	    .attr("fill", "#000")
+	    .attr("text-anchor", "start")
+	    .attr("font-weight", "bold")
+	    .text(text_array[i].name);
+		}
+  }
+	var top_text = '';
+	for (var i = 0; i < event_array.length; i++) {
+		if (event_array[i].year == Math.floor(sleep_count / year_bin) + start_year) {
+            top_text += event_array[i].event;
+        }
+	}
+	svg.append("text")
+    //.attr("class", "caption")
+    .attr("x", 350)
+    .attr("y", 30)
+    .attr("fill", "#000")
+    .attr("font-size", "24pt")
+    .attr("text-anchor", "start")
+    .attr("font-weight", "bold")
+    .text((Math.floor(sleep_count / year_bin) + start_year) + '年 ' + top_text);
+	svg.append("text")
+	    .attr("x", 690)
+	    .attr("y", 540)
+	    .attr("fill", "#000")
+	    .attr("text-anchor", "start")
+	    .attr("font-weight", "bold")
+	    .text('州');
+	svg.append("text")
+	    .attr("x", 690)
+	    .attr("y", 580)
+	    .attr("fill", "#000")
+	    .attr("text-anchor", "start")
+	    .attr("font-weight", "bold")
+	    .text('準州');
+
+	sleep_count += 1;
+	if (flag == true) {
+		//requestID = requestAnimationFrame(draw_us_map);
+		requestID = setTimeout(draw_us_map, timeout, true); 
+  }
+
+};
+
+d3.json("https://d3js.org/us-10m.v1.json", function(error, us) {
+  if (error) throw error;
+	g_us = us;
+	// sample
+	svg.append("rect")
+	    .attr("x", 650)
+      .attr("y", 520)
+		  .attr("width", 30)
+		  .attr("height", 30)
+		  .attr("fill", '#00f');
+
+	svg.append("rect")
+	    .attr("x", 650)
+      .attr("y", 560)
+		  .attr("width", 30)
+		  .attr("height", 30)
+		  .attr("fill", '#aaf');
+
+	draw_us_map(false);
+	var element_init = document.getElementById('button_main');
+	element_init.disabled = false;
+
+});
+
+</script>
