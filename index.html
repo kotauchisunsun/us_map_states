@@ -41,7 +41,7 @@
 	cursor: pointer;
 	text-align: center;
 	text-decoration: none;
-	font: 20px/100% Arial, Helvetica, sans-serif;
+	font: 24px/100% Arial, Helvetica, sans-serif;
 	padding: .5em 2em .55em;
 	text-shadow: 0 1px 1px rgba(0,0,0,.3);
 	border-radius: .5em;
@@ -88,16 +88,113 @@
 	/*cursor: not-allowed;*/
 }
 
+#slider1{
+    width: 950px;
+		margin: 20px;
+}
+#slider1 .ui-slider-range { background: #729fcf; }  /* スライダの背景色 */
+#slider1 .ui-slider-handle { border-color: #729fcf; }   /* スライダをドラッグできる部分の枠色 */
+
 </style>
-<svg width="960" height="600"></svg>
+<svg width="1100" height="600"></svg>
 <div id="tooltip-container"></div>
 <br>
-	<button class="button white" id='button_main' onClick='draw_main()' disabled="disabled">Start</button>
-	<button class="button white" id='button_init' onClick='draw_init()' disabled="disabled">Init</button>
+<div>
+	<button class="button white" id='button_main' onClick='draw_main()' disabled="disabled">⏵</button>
+	<button class="button white" id='button_speed_down' onClick='change_speed(-1)' >⏴⏴</button>
+	<button class="button white" id='button_speed_up'   onClick='change_speed(1)' >⏵⏵</button>
+</div>
+
+<div id="slider1"></div>
+
 <script src="https://d3js.org/d3.v4.min.js"></script>
 <script src="https://d3js.org/topojson.v2.min.js"></script>
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+<link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/themes/smoothness/jquery-ui.css">
+<script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
+
 <script>
+var path = d3.geoPath();
+var sleep_count     = 0;
+var start_year      = 1765;
+var end_year        = 1959;
+var year_bin        = 1;
+
+var time_out_array = [
+	2000
+	,1000
+	,500
+	,250
+	,100
+	,50
+];
+var time_out_color_array = [
+	'#000077'
+	,'#0000AA'
+	,'#0000ff'
+	,'#3333ff'
+	,'#8888ff'
+	,'#AAAAff'
+];
+
+var timeout         = time_out_array[0];
+
+var sleep_max_count = (end_year - start_year + 1) * year_bin;
+var g_us;
+var requestID;
+var button_status = 0;
+
+$(function(){
+    $("#slider1").slider({
+        range: "min",
+        min: start_year,
+        max: end_year,
+        value: start_year,
+        step: 1,
+        slide: function(event, ui) {
+						change_slide(ui.value);
+        }
+    });
+});
+function change_speed(change_value) {
+	var count = 0;
+	for (var i = 0; i < time_out_array.length; i++) {
+		if (timeout == time_out_array[i]) {
+			count = i;
+      break;
+    }
+	}
+	if (change_value == 1) {
+		count += 1;
+  } else {
+		count -= 1;
+	}
+	if (count < 0) {
+    count = 0;
+  } else if (count > time_out_array.length - 1) {
+    count = time_out_array.length - 1;
+  }
+	timeout = time_out_array[count];
+	
+	var element = document.getElementById('slider1');
+	element.children[0].style.background = time_out_color_array[count];
+
+}
+
+// スライダー変更
+// value: スライダーの値
+function change_slide(value) {
+	var element_main = document.getElementById('button_main');
+	button_status = 0;
+	element_main.innerHTML = '⏵';
+	clearTimeout(requestID);
+	sleep_count = (value - start_year) * year_bin;
+	if (value != end_year) {
+    var element_main = document.getElementById('button_main');
+		element_main.disabled = false;
+  }
+	draw_us_map(false);
+}
 
 
 // state info
@@ -105,57 +202,60 @@
 // territory: 準州設定年
 // separation: 分離した年・
 // id: us mapのid
+// csa: アメリカ連合合流年
+// re_state: 復帰年
+// relegation: CSA敗戦年
 var state_info_array = [
-	 {name: 'デラウェア州',         state:1787, territory:null, separation: null, id: '10'}
-	,{name: 'ペンシルベニア州',     state:1787, territory:null, separation: null, id: '42'}
-	,{name: 'ニュージャージー州',   state:1787, territory:null, separation: null, id: '34'}
-	,{name: 'ジョージア州',         state:1788, territory:null, separation: null, id: '13' }
-	,{name: 'コネチカット州',       state:1788, territory:null, separation: null, id: '09' }
-	,{name: 'マサチューセッツ州',   state:1788, territory:null, separation: null, id: '25' }
-	,{name: 'メリーランド州',       state:1788, territory:null, separation: null, id: '24' }
-	,{name: 'サウスカロライナ州',   state:1788, territory:null, separation: null, id: '45' }
-	,{name: 'ニューハンプシャー州', state:1788, territory:null, separation: null, id: '33' }
-	,{name: 'バージニア州',         state:1788, territory:null, separation: null, id: '51' }
-	,{name: 'ニューヨーク州',       state:1788, territory:null, separation: null, id: '36' }
-	,{name: 'ノースカロライナ州',   state:1789, territory:null, separation: null, id: '37' }
-	,{name: 'ロードアイランド州',   state:1790, territory:null, separation: null, id: '44' }
-	,{name: 'バーモント州',         state:1791, territory:null, separation: null, id: '50' }
-	,{name: 'ケンタッキー州',       state:1788, territory:null, separation: 1792, id: '21' }
-	,{name: 'テネシー州',           state:1796, territory:1790, separation: null, id: '47' }
-	,{name: 'オハイオ州',           state:1803, territory:null, separation: null, id: '39' }
-	,{name: 'ルイジアナ州',         state:1812, territory:1804, separation: null, id: '22' }
-	,{name: 'インディアナ州',       state:1816, territory:1800, separation: null, id: '18' }
-	,{name: 'ミシシッピ州',         state:1817, territory:1798, separation: null, id: '28' }
-	,{name: 'イリノイ州',           state:1818, territory:1809, separation: null, id: '17' }
-	,{name: 'アラバマ州',           state:1819, territory:1798, separation: null, id: '01' }
-	,{name: 'メイン州',             state:1788, territory:null, separation: 1820, id: '23' }
-	,{name: 'ミズーリ州',           state:1821, territory:1805, separation: null, id: '29' }
-	,{name: 'アーカンソー州',       state:1836, territory:1819, separation: null, id: '05' }
-	,{name: 'ミシガン州',           state:1837, territory:1805, separation: null, id: '26' }
-	,{name: 'フロリダ州',           state:1845, territory:1822, separation: null, id: '12' }
-	,{name: 'テキサス州',           state:1845, territory:null, separation: null, id: '48' }
-	,{name: 'アイオワ州',           state:1846, territory:1837, separation: null, id: '19' }
-	,{name: 'ウィスコンシン州',     state:1848, territory:1836, separation: null, id: '55' }
-	,{name: 'カリフォルニア州',     state:1850, territory:null, separation: null, id: '06' }
-	,{name: 'ミネソタ州',           state:1858, territory:1849, separation: null, id: '27' }
-	,{name: 'オレゴン州',           state:1859, territory:1859, separation: null, id: '41' }
-	,{name: 'カンザス州',           state:1861, territory:1854, separation: null, id: '20' }
-	,{name: 'ウェストバージニア州', state:1788, territory:null, separation: 1863, id: '54' }
-	,{name: 'ネバダ州',             state:1864, territory:1861, separation: null, id: '32' }
-	,{name: 'ネブラスカ州',         state:1867, territory:1854, separation: null, id: '31' }
-	,{name: 'コロラド州',           state:1876, territory:1861, separation: null, id: '08' }
-	,{name: 'ノースダコタ州',       state:1889, territory:1861, separation: null, id: '38' }
-	,{name: 'サウスダコタ州',       state:1889, territory:1861, separation: null, id: '46' }
-	,{name: 'モンタナ州',           state:1889, territory:1864, separation: null, id: '30' }
-	,{name: 'ワシントン州',         state:1889, territory:1853, separation: null, id: '53' }
-	,{name: 'アイダホ州',           state:1890, territory:1863, separation: null, id: '16' }
-	,{name: 'ワイオミング州',       state:1890, territory:1868, separation: null, id: '56' }
-	,{name: 'ユタ州',               state:1896, territory:1850, separation: null, id: '49' }
-	,{name: 'オクラホマ州',         state:1907, territory:1890, separation: null, id: '40' }
-	,{name: 'ニューメキシコ州',     state:1912, territory:1850, separation: null, id: '35' }
-	,{name: 'アリゾナ州',           state:1912, territory:1863, separation: null, id: '04' }
-	,{name: 'アラスカ州',           state:1959, territory:1912, separation: null, id: '02' }
-	,{name: 'ハワイ州',             state:1959, territory:1898, separation: null, id: '15' }
+	 {name: 'デラウェア州',         state:1787, territory:null, separation: null, id: '10' ,csa: null, re_state: null, relegation: null}
+	,{name: 'ペンシルベニア州',     state:1787, territory:null, separation: null, id: '42' ,csa: null, re_state: null, relegation: null}
+	,{name: 'ニュージャージー州',   state:1787, territory:null, separation: null, id: '34' ,csa: null, re_state: null, relegation: null}
+	,{name: 'ジョージア州',         state:1788, territory:null, separation: null, id: '13' ,csa: 1861, re_state: 1870, relegation: 1865}
+	,{name: 'コネチカット州',       state:1788, territory:null, separation: null, id: '09' ,csa: null, re_state: null, relegation: null}
+	,{name: 'マサチューセッツ州',   state:1788, territory:null, separation: null, id: '25' ,csa: null, re_state: null, relegation: null}
+	,{name: 'メリーランド州',       state:1788, territory:null, separation: null, id: '24' ,csa: null, re_state: null, relegation: null}
+	,{name: 'サウスカロライナ州',  state:1788, territory:null, separation: null, id: '45' ,csa: 1861, re_state: 1868, relegation: 1865}
+	,{name: 'ニューハンプシャー州', state:1788, territory:null, separation: null, id: '33' ,csa: null, re_state: null, relegation: null}
+	,{name: 'バージニア州',         state:1788, territory:null, separation: null, id: '51' ,csa: 1861, re_state: 1870, relegation: 1865}
+	,{name: 'ニューヨーク州',       state:1788, territory:null, separation: null, id: '36' ,csa: null, re_state: null, relegation: null}
+	,{name: 'ノースカロライナ州',   state:1789, territory:null, separation: null, id: '37' ,csa: 1861, re_state: 1868, relegation: 1865}
+	,{name: 'ロードアイランド州',   state:1790, territory:null, separation: null, id: '44' ,csa: null, re_state: null, relegation: null}
+	,{name: 'バーモント州',         state:1791, territory:null, separation: null, id: '50' ,csa: null, re_state: null, relegation: null}
+	,{name: 'ケンタッキー州',       state:1788, territory:null, separation: 1792, id: '21' ,csa: null, re_state: null, relegation: null}
+	,{name: 'テネシー州',           state:1796, territory:1790, separation: null, id: '47' ,csa: 1861, re_state: 1866, relegation: 1865}
+	,{name: 'オハイオ州',           state:1803, territory:null, separation: null, id: '39' ,csa: null, re_state: null, relegation: null}
+	,{name: 'ルイジアナ州',         state:1812, territory:1804, separation: null, id: '22' ,csa: 1861, re_state: 1868, relegation: 1865}
+	,{name: 'インディアナ州',       state:1816, territory:1800, separation: null, id: '18' ,csa: null, re_state: null, relegation: null}
+	,{name: 'ミシシッピ州',         state:1817, territory:1798, separation: null, id: '28' ,csa: 1861, re_state: 1870, relegation: 1865}
+	,{name: 'イリノイ州',           state:1818, territory:1809, separation: null, id: '17' ,csa: null, re_state: null, relegation: null}
+	,{name: 'アラバマ州',           state:1819, territory:1798, separation: null, id: '01' ,csa: 1861, re_state: 1868, relegation: 1865}
+	,{name: 'メイン州',             state:1788, territory:null, separation: 1820, id: '23' ,csa: null, re_state: null, relegation: null}
+	,{name: 'ミズーリ州',           state:1821, territory:1805, separation: null, id: '29' ,csa: null, re_state: null, relegation: null}
+	,{name: 'アーカンソー州',       state:1836, territory:1819, separation: null, id: '05' ,csa: 1861, re_state: 1868, relegation: 1865}
+	,{name: 'ミシガン州',           state:1837, territory:1805, separation: null, id: '26' ,csa: null, re_state: null, relegation: null}
+	,{name: 'フロリダ州',           state:1845, territory:1822, separation: null, id: '12' ,csa: 1861, re_state: 1868, relegation: 1865}
+	,{name: 'テキサス州',           state:1845, territory:null, separation: null, id: '48' ,csa: 1861, re_state: 1870, relegation: 1865}
+	,{name: 'アイオワ州',           state:1846, territory:1837, separation: null, id: '19' ,csa: null, re_state: null, relegation: null}
+	,{name: 'ウィスコンシン州',     state:1848, territory:1836, separation: null, id: '55' ,csa: null, re_state: null, relegation: null}
+	,{name: 'カリフォルニア州',     state:1850, territory:null, separation: null, id: '06' ,csa: null, re_state: null, relegation: null}
+	,{name: 'ミネソタ州',           state:1858, territory:1849, separation: null, id: '27' ,csa: null, re_state: null, relegation: null}
+	,{name: 'オレゴン州',           state:1859, territory:1859, separation: null, id: '41' ,csa: null, re_state: null, relegation: null}
+	,{name: 'カンザス州',           state:1861, territory:1854, separation: null, id: '20' ,csa: null, re_state: null, relegation: null}
+	,{name: 'ウェストバージニア州', state:1788, territory:null, separation: 1863, id: '54' ,csa: 1861, re_state: 1863, relegation: null}
+	,{name: 'ネバダ州',             state:1864, territory:1861, separation: null, id: '32' ,csa: null, re_state: null, relegation: null}
+	,{name: 'ネブラスカ州',         state:1867, territory:1854, separation: null, id: '31' ,csa: null, re_state: null, relegation: null}
+	,{name: 'コロラド州',           state:1876, territory:1861, separation: null, id: '08' ,csa: null, re_state: null, relegation: null}
+	,{name: 'ノースダコタ州',       state:1889, territory:1861, separation: null, id: '38' ,csa: null, re_state: null, relegation: null}
+	,{name: 'サウスダコタ州',       state:1889, territory:1861, separation: null, id: '46' ,csa: null, re_state: null, relegation: null}
+	,{name: 'モンタナ州',           state:1889, territory:1864, separation: null, id: '30' ,csa: null, re_state: null, relegation: null}
+	,{name: 'ワシントン州',         state:1889, territory:1853, separation: null, id: '53' ,csa: null, re_state: null, relegation: null}
+	,{name: 'アイダホ州',           state:1890, territory:1863, separation: null, id: '16' ,csa: null, re_state: null, relegation: null}
+	,{name: 'ワイオミング州',       state:1890, territory:1868, separation: null, id: '56' ,csa: null, re_state: null, relegation: null}
+	,{name: 'ユタ州',               state:1896, territory:1850, separation: null, id: '49' ,csa: null, re_state: null, relegation: null}
+	,{name: 'オクラホマ州',         state:1907, territory:1890, separation: null, id: '40' ,csa: null, re_state: null, relegation: null}
+	,{name: 'ニューメキシコ州',     state:1912, territory:1850, separation: null, id: '35' ,csa: null, re_state: null, relegation: null}
+	,{name: 'アリゾナ州',           state:1912, territory:1863, separation: null, id: '04' ,csa: null, re_state: null, relegation: null}
+	,{name: 'アラスカ州',           state:1959, territory:1912, separation: null, id: '02' ,csa: null, re_state: null, relegation: null}
+	,{name: 'ハワイ州',             state:1959, territory:1898, separation: null, id: '15' ,csa: null, re_state: null, relegation: null}
 ];
 
 // 各種イベント
@@ -168,6 +268,7 @@ var event_array = [
 	,{year: 1773, event: '💣 ボストン茶会事件'}
 	,{year: 1774, event: '⚖ 第一回大陸会議開催'}
 	,{year: 1775, event: '💣 アメリカ独立戦争開始'}
+	,{year: 1776, event: '⚖ 独立宣言'}
 	,{year: 1783, event: '💣 アメリカ独立戦争終了'}
 	,{year: 1788, event: '💣 合衆国会議設立'}
 	,{year: 1789, event: '💣 フランス革命開始'}
@@ -178,6 +279,7 @@ var event_array = [
 	,{year: 1820, event: '⚖ ミズリー妥協'}
 	,{year: 1846, event: '💣 米墨戦争開始'}
 	,{year: 1848, event: '💣 米墨戦争終了'}
+	,{year: 1860, event: '⚖ リンカーン、大統領選に勝ち抜く'}
 	,{year: 1861, event: '💣 南北戦争開始'}
 	,{year: 1862, event: '⚖ リンカーンによる奴隷解放宣言'}
 	,{year: 1865, event: '💣 南北戦争終了'}
@@ -196,34 +298,83 @@ var event_array = [
 	,{year: 1959, event: '🗺 50州揃う'}
 ];
 
+// 戦争イベント
+// year: 勃発年
+// name:　戦場名
+// x:　x位置
+// y: y位置
+// color: 表示色(青はUSAが勝利した場合、赤は敵、黒はイーブン)
+var war_array = [
+	 {year: 1775, name: 'レキシントン・コンコード',      x:888, y:160,   color:'#009'}
+	,{year: 1775, name: 'バンカーヒル',      x:892, y:160,   color:'#900'}
+	,{year: 1776, name: 'ロングアイランド',      x:873, y:200,   color:'#900'}
+	,{year: 1776, name: 'トレントン',      x:844, y:222,   color:'#009'}
+	,{year: 1777, name: 'プリンストン',      x:844, y:222,   color:'#009'}
+	,{year: 1777, name: 'ブランディワイン',      x:831, y:231,   color:'#900'}
+	,{year: 1777, name: '第一次サラトガ',      x:848, y:161,   color:'#009'}
+	,{year: 1777, name: '第二次サラトガ',      x:848, y:161,   color:'#009'}
+	,{year: 1778, name: 'モンマス',      x:854, y:219,   color:'#000'}
+	,{year: 1780, name: 'キャムデン',      x:767, y:374,   color:'#900'}
+	,{year: 1780, name: 'キングスマウンテン',      x:751, y:374,   color:'#009'}
+	,{year: 1781, name: 'チェサピーク湾',      x:835, y:304,   color:'#000'}
+	,{year: 1781, name: 'ヨークタウン',      x:826, y:286,   color:'#009'}
+	,{year: 1846, name: 'テキサス砦包囲戦',      x:444, y:576,   color:'#000'}
+	,{year: 1846, name: 'パロ・アルト',      x:444, y:576,   color:'#000'}
+	,{year: 1846, name: 'レサカ・デ・ラ・パルマ',      x:444, y:576,   color:'#009'}
+	,{year: 1846, name: 'カニョンシト',      x:311, y:357,   color:'#009'}
+	,{year: 1846, name: 'サンタフェ',      x:311, y:357,   color:'#009'}
+	,{year: 1846, name: 'モンテレー',      x:394, y:525,   color:'#009'}
+	,{year: 1847, name: 'カニャダ',      x:299, y:363,   color:'#009'}
+	,{year: 1847, name: 'ブエナ・ビスタ',      x:370, y:522,   color:'#009'}
+	,{year: 1861, name: 'サムター要塞',      x:782, y:408,   color:'#900'}
+	,{year: 1861, name: '第一次ブルラン',    x:808, y:263,   color:'#900'}
+	,{year: 1861, name: 'ウィルソンズ・クリーク', x:535, y:331,   color:'#900'}
+	,{year: 1862, name: 'ドネルソン砦',      x:632 , y:340,  color:'#009'}
+	,{year: 1862, name: 'ピーリッジ',        x:532 , y:351,  color:'#009'}
+	,{year: 1862, name: 'ハンプトン・ローズ',  x:835, y:302,   color:'#000'}
+	,{year: 1862, name: 'シャイロー',  x:631, y:371 , color:'#009'}
+	,{year: 1862, name: 'ニューオーリンズ',  x:624 , y:501 , color:'#009'}
+	,{year: 1862, name: 'コリンス',  x:630 , y:390 , color:'#009'}
+	,{year: 1862, name: 'セブンパインズ',  x:814 , y:303 , color:'#000'}
+	,{year: 1862, name: '七日間',  x:814 , y:303 , color:'#900'}
+	,{year: 1862, name: '第二次ブルラン',  x:804 , y:267 , color:'#900'}
+	,{year: 1862, name: 'アンティータム',  x:798 , y:250 , color:'#009'}
+	,{year: 1862, name: 'ペリービル',  x:675 , y:314 , color:'#000'}
+	,{year: 1862, name: 'フレデリックスバーグ',  x:798 , y:271 , color:'#900'}
+	
+	,{year: 1862, name: 'ストーンズリバー',  x:659 , y:355 , color:'#000'}
+	,{year: 1863, name: 'チャンセラーズヴィル',  x:805 , y:288 , color:'#900'}
+	,{year: 1863, name: 'ゲティスバーグ',  x:807 , y:240 , color:'#009'}
+	,{year: 1863, name: 'ビックスバーグ',  x:584 , y:441 , color:'#009'}
+	,{year: 1863, name: 'チカマウガ',  x:689 , y:374 , color:'#900'}
+	,{year: 1863, name: 'チャタヌーガ',  x:448 , y:393 , color:'#009'}
+
+	,{year: 1864, name: '荒野',  x:800 , y:277 , color:'#000'}
+	,{year: 1864, name: 'スポットシルバニア・コートハウス',  x:801 , y:275 , color:'#000'}
+	,{year: 1864, name: 'コールドハーバー',  x:806 , y:287 , color:'#900'}
+	,{year: 1864, name: 'アトランタ',  x:712 , y:403 , color:'#009'}
+	,{year: 1864, name: 'モービル湾',  x:638 , y:475 , color:'#009'}
+	,{year: 1864, name: 'フランクリン',  x:643 , y:355 , color:'#009'}
+	,{year: 1864, name: 'ナッシュビル',  x:661 , y:335 , color:'#009'}
+
+	,{year: 1865, name: 'ウィルミントン',  x:832 , y:235 , color:'#009'}
+	,{year: 1865, name: 'ファイブフォークス',  x:812 , y:302 , color:'#009'}
+	,{year: 1898, name: 'サンチャゴ・デ・キューバ海戦',  x:890 , y:680 , color:'#009'}
+];
 var svg = d3.select("svg");
 
-var path = d3.geoPath();
-var sleep_count     = 0;
-var start_year      = 1765;
-var end_year        = 1959;
-//var year_bin        = 30;
-var year_bin        = 1;
-var timeout         = 1500;
-//var timeout         = 10;
-var sleep_max_count = (end_year - start_year + 1) * year_bin;
-var g_us;
-var requestID;
-var button_status = 0;
 
 function draw_main() {
 	var element_main = document.getElementById('button_main');
 	if (button_status == 0) {
     button_status = 1;
-		element_main.innerHTML = 'Stop';
-		var element_init = document.getElementById('button_init');
-		element_init.disabled = true;
+		element_main.innerHTML = '⏸';
 
 		draw_us_map(true);
 		
   } else {
 		button_status = 0;
-		element_main.innerHTML = 'Start';
+		element_main.innerHTML = '⏵';
 		clearTimeout(requestID);
 		var element_init = document.getElementById('button_init');
 		element_init.disabled = false;
@@ -234,8 +385,6 @@ function draw_init() {
 	sleep_count = 0;
 	clearTimeout(requestID);
 	draw_us_map(false);
-	var element_init = document.getElementById('button_init');
-	element_init.disabled = true;
 	var element_main = document.getElementById('button_main');
 	element_main.innerHTML = 'Start';
 	element_main.disabled = false;
@@ -245,42 +394,146 @@ function draw_init() {
 
 function draw_us_map(flag) {
 	if (sleep_count >= sleep_max_count) {
-		var element_init = document.getElementById('button_init');
-		element_init.disabled = false;
 		var element_main = document.getElementById('button_main');
 		element_main.disabled = true;
     return;
   }
-	//console.log('y: ' + (sleep_count + start_year));
-	svg.selectAll('g').remove();
+	var year = Math.floor(sleep_count / year_bin) + start_year;
+  $("#slider1").slider({
+      value: year, 
+  });
+
 	svg.selectAll('text').remove();
-	svg.selectAll('path').remove();
-	//
 	var text_array = [];
+	for (var i = 0; i < state_info_array.length; i++) {
+		if (state_info_array[i].separation == null &&
+				state_info_array[i].state == Math.floor(sleep_count / year_bin) + start_year) {
+			text_array.push({name: state_info_array[i].name, x: state_info_array[i].x, y:state_info_array[i].y});
+    }
+		if (state_info_array[i].separation != null &&
+				state_info_array[i].separation == Math.floor(sleep_count / year_bin) + start_year) {
+			text_array.push({name: state_info_array[i].name, x: state_info_array[i].x, y:state_info_array[i].y});
+    }
+		var element = document.getElementById('state_' + state_info_array[i].id);
+		if (flag == false) {
+      element.style.fill = '#ccc';
+    }
+
+		if (state_info_array[i].csa == null) {
+			if (state_info_array[i].state <= Math.floor(sleep_count / year_bin) + start_year) {
+				element.style.fill = '#88f';
+			} else if (state_info_array[i].territory != null &&
+								 state_info_array[i].territory <=  Math.floor(sleep_count / year_bin) + start_year) {
+				element.style.fill = '#ddf';
+			}
+    }	else if (state_info_array[i].csa != null &&
+					state_info_array[i].relegation != null) {
+			// CSA
+			if (state_info_array[i].re_state <=  Math.floor(sleep_count / year_bin) + start_year) {
+				element.style.fill = '#88f';
+			} else if (state_info_array[i].relegation <=  Math.floor(sleep_count / year_bin) + start_year) {
+				element.style.fill = '#ccc';
+			} else if (state_info_array[i].csa <=  Math.floor(sleep_count / year_bin) + start_year) {
+				element.style.fill = '#f88';
+			} else if (state_info_array[i].state <=  Math.floor(sleep_count / year_bin) + start_year) {
+				element.style.fill = '#88f';
+			} else if (state_info_array[i].territory != null &&
+								 state_info_array[i].territory <=  Math.floor(sleep_count / year_bin) + start_year) {
+				element.style.fill = '#ddf';
+			}	
+
+		} else {
+			// ウェストバージニア のみ
+			if (state_info_array[i].re_state <=  Math.floor(sleep_count / year_bin) + start_year) {
+				element.style.fill = '#88f';
+			} else if (state_info_array[i].csa <=  Math.floor(sleep_count / year_bin) + start_year) {
+				element.style.fill = '#f88';
+			} else if (state_info_array[i].state <=  Math.floor(sleep_count / year_bin) + start_year) {
+				element.style.fill = '#88f';
+			}	
+		}
+	}
+	
+	if (text_array.length != 0) {
+		for (var i = 0; i < text_array.length; i++) {
+			svg.append("text")
+	    .attr("x", text_array[i].x)
+	    .attr("y", text_array[i].y)
+	    .attr("fill", "#000")
+	    .attr("text-anchor", "start")
+	    .attr("font-weight", "bold")
+	    .text(text_array[i].name);
+		}
+  }
+	var top_text = '';
+	for (var i = 0; i < event_array.length; i++) {
+		if (event_array[i].year == Math.floor(sleep_count / year_bin) + start_year) {
+            top_text += event_array[i].event;
+        }
+	}
+	svg.append("text")
+    .attr("x", 350)
+    .attr("y", 30)
+    .attr("fill", "#000")
+    .attr("font-size", "24pt")
+    .attr("text-anchor", "start")
+    .attr("font-weight", "bold")
+    .text((Math.floor(sleep_count / year_bin) + start_year) + '年 ' + top_text);
+	svg.append("text")
+	    .attr("x", 690)
+	    .attr("y", 540)
+	    .attr("fill", "#000")
+	    .attr("text-anchor", "start")
+	    .attr("font-weight", "bold")
+	    .text('州');
+	svg.append("text")
+	    .attr("x", 590)
+	    .attr("y", 540)
+	    .attr("fill", "#000")
+	    .attr("text-anchor", "start")
+	    .attr("font-weight", "bold")
+	    .text('CSA');
+	svg.append("text")
+	    .attr("x", 690)
+	    .attr("y", 580)
+	    .attr("fill", "#000")
+	    .attr("text-anchor", "start")
+	    .attr("font-weight", "bold")
+	    .text('準州');
+	//
+	for (var i = 0; i < war_array.length; i++){
+		if (Math.floor(sleep_count / year_bin) + start_year == war_array[i].year) {
+			svg.append("text")
+					.attr("x", war_array[i].x)
+					.attr("y", war_array[i].y)
+					.attr("fill", war_array[i].color)
+					.attr("text-anchor", "start")
+					.attr("font-weight", "bold")
+					.text('⚔' + war_array[i].name);
+    }
+	}
+
+	sleep_count += 1;
+	if (flag == true) {
+		//requestID = requestAnimationFrame(draw_us_map);
+		requestID = setTimeout(draw_us_map, timeout, true); 
+  }
+
+};
+
+d3.json("https://d3js.org/us-10m.v1.json", function(error, us) {
+  if (error) throw error;
 	svg.append("g")
     .selectAll("path")
-    .data(topojson.feature(g_us, g_us.objects.states).features)
+    .data(topojson.feature(us, us.objects.states).features)
     .enter().append("path")
       .attr("d", path)
       .style("fill", function(d) {
 					for (var i = 0; i < state_info_array.length; i++) {
 						if (d.id == state_info_array[i].id) {
-							if (state_info_array[i].separation == null &&
-									state_info_array[i].state == Math.floor(sleep_count / year_bin) + start_year) {
-								text_array.push({name: state_info_array[i].name, x: d.geometry.coordinates[0][0][0][0], y:d.geometry.coordinates[0][0][0][1]});
-              }
-							if (state_info_array[i].separation != null &&
-									state_info_array[i].separation == Math.floor(sleep_count / year_bin) + start_year) {
-								text_array.push({name: state_info_array[i].name, x: d.geometry.coordinates[0][0][0][0], y:d.geometry.coordinates[0][0][0][1]});
-              }
-							if (state_info_array[i].state <=  Math.floor(sleep_count / year_bin) + start_year) {
-                  return "#00f";
-              } else if (state_info_array[i].territory != null &&
-												 state_info_array[i].territory <=  Math.floor(sleep_count / year_bin) + start_year) {
-                  return "#aaf";
-              } else {
-                  return "#ccc";
-							}
+							state_info_array[i].x = d.geometry.coordinates[0][0][0][0];
+							state_info_array[i].y = d.geometry.coordinates[0][0][0][1];
+              return "#ccc";
             }
 					}
       })
@@ -290,6 +543,8 @@ function draw_us_map(flag) {
 						var state_year = '';
 						for (var i = 0; i < state_info_array.length; i++) {
 							if (d.id == state_info_array[i].id) {
+								//state_info_array[i].x = d.geometry.coordinates[0][0][0][0];
+								//state_info_array[i].y = d.geometry.coordinates[0][0][0][1];
 								state_name = state_info_array[i].name;
 								if (state_info_array[i].separation == null) {
                   state_year = state_info_array[i].state;
@@ -337,33 +592,44 @@ function draw_us_map(flag) {
 
   svg.append("path")
       .attr("class", "state-borders")
-      .attr("d", path(topojson.mesh(g_us, g_us.objects.states, function(a, b) { return a !== b; })));
-	if (text_array.length != 0) {
-		for (var i = 0; i < text_array.length; i++) {
-			svg.append("text")
-	    .attr("x", text_array[i].x)
-	    .attr("y", text_array[i].y)
-	    .attr("fill", "#000")
-	    .attr("text-anchor", "start")
-	    .attr("font-weight", "bold")
-	    .text(text_array[i].name);
-		}
-  }
-	var top_text = '';
-	for (var i = 0; i < event_array.length; i++) {
-		if (event_array[i].year == Math.floor(sleep_count / year_bin) + start_year) {
-            top_text += event_array[i].event;
-        }
+      .attr("id", "bbb")
+      .attr("d", path(topojson.mesh(us, us.objects.states, function(a, b) { return a !== b; })));
+	// id add
+	var elements = document.getElementsByTagName('g')[0].children;
+	for (var i = 0; i < elements.length; i++) {
+		elements[i].setAttribute('id', 'state_' + us.objects.states.geometries[i].id);
 	}
+
+	g_us = us;
+	// sample
+	svg.append("rect")
+	    .attr("x", 650)
+      .attr("y", 520)
+		  .attr("width", 30)
+		  .attr("height", 30)
+		  .attr("fill", '#88f');
+
+	svg.append("rect")
+	    .attr("x", 650)
+      .attr("y", 560)
+		  .attr("width", 30)
+		  .attr("height", 30)
+		  .attr("fill", '#ddf');
+
+	svg.append("rect")
+	    .attr("x", 550)
+      .attr("y", 520)
+		  .attr("width", 30)
+		  .attr("height", 30)
+		  .attr("fill", '#f88');
 	svg.append("text")
-    //.attr("class", "caption")
     .attr("x", 350)
     .attr("y", 30)
     .attr("fill", "#000")
     .attr("font-size", "24pt")
     .attr("text-anchor", "start")
     .attr("font-weight", "bold")
-    .text((Math.floor(sleep_count / year_bin) + start_year) + '年 ' + top_text);
+    .text(start_year+ '年 ');
 	svg.append("text")
 	    .attr("x", 690)
 	    .attr("y", 540)
@@ -372,6 +638,13 @@ function draw_us_map(flag) {
 	    .attr("font-weight", "bold")
 	    .text('州');
 	svg.append("text")
+	    .attr("x", 590)
+	    .attr("y", 540)
+	    .attr("fill", "#000")
+	    .attr("text-anchor", "start")
+	    .attr("font-weight", "bold")
+	    .text('CSA');
+	svg.append("text")
 	    .attr("x", 690)
 	    .attr("y", 580)
 	    .attr("fill", "#000")
@@ -379,35 +652,11 @@ function draw_us_map(flag) {
 	    .attr("font-weight", "bold")
 	    .text('準州');
 
-	sleep_count += 1;
-	if (flag == true) {
-		//requestID = requestAnimationFrame(draw_us_map);
-		requestID = setTimeout(draw_us_map, timeout, true); 
-  }
-
-};
-
-d3.json("https://d3js.org/us-10m.v1.json", function(error, us) {
-  if (error) throw error;
-	g_us = us;
-	// sample
-	svg.append("rect")
-	    .attr("x", 650)
-      .attr("y", 520)
-		  .attr("width", 30)
-		  .attr("height", 30)
-		  .attr("fill", '#00f');
-
-	svg.append("rect")
-	    .attr("x", 650)
-      .attr("y", 560)
-		  .attr("width", 30)
-		  .attr("height", 30)
-		  .attr("fill", '#aaf');
-
-	draw_us_map(false);
+	//draw_us_map(false);
 	var element_init = document.getElementById('button_main');
 	element_init.disabled = false;
+	var element = document.getElementById('slider1');
+	element.children[0].style.background = time_out_color_array[0];
 
 });
 
